@@ -146,9 +146,15 @@ sub upload {
   my @attachments = find_attachment_filenames($mostly_confluence_markup);
   my $attachment_errors = 0;
   foreach my $attachment (@attachments) {
-    my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment);
-    if (! -f $attachment_path) {
-      print "  Attachment '$attachment' does not exist in the attachment directory\n";
+    if (exists $attachment_lookup{$attachment}) {
+      my $attachment_sub_path = $attachment_lookup{$attachment};
+      my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
+      if (! -f $attachment_path) {
+        print "  Attachment '$attachment' does not exist in the attachment directory\n";
+        $attachment_errors++;
+      }
+    } else {
+      print "  Attachment '$attachment' has no lookup entry\n";
       $attachment_errors++;
     }
   }
@@ -209,13 +215,13 @@ sub upload {
     die "" . Dumper($content_response) . "\n";
   }
 
-  print "content response: " . Dumper($content_response) . "\n";
-  my $id = $content_response->{id};
-  print "the id is $id\n";
+  # print "content response: " . Dumper($content_response) . "\n";
+  my $content_response_json = decode_json $content_response->content();
+  my $id = $content_response_json->{id};
 
   my $attach_uri = "$base_uri/content/$id/child/attachment";
 
-  print "Page '$page_name' has " . scalar(@attachments) . " attachment(s):\n";
+  print "Page '$page_name' (id $id) has " . scalar(@attachments) . " attachment(s):\n";
   foreach my $attachment (@attachments) {
     print "Uploading attachment '$attachment'\n";
     my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment);

@@ -31,7 +31,17 @@ use HTTP::Request::Common;
 use JSON;
 
 use lib '.';
-use TweakMarkup;
+use TweakMarkup qw(tweak_markup find_attachment_filenames);
+
+# forward declarations
+sub load_properties;
+sub index_attachments;
+sub check_attachments;
+sub upload;
+sub load_page;
+sub create_post_request;
+sub create_attachment_post_request;
+
 
 my $config_file = 'configuration.properties';
 my $config = load_properties($config_file);

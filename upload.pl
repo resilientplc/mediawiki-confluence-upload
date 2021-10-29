@@ -224,7 +224,8 @@ sub upload {
   print "Page '$page_name' (id $id) has " . scalar(@attachments) . " attachment(s):\n";
   foreach my $attachment (@attachments) {
     print "Uploading attachment '$attachment'\n";
-    my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment);
+    my $attachment_sub_path = $attachment_lookup{$attachment};
+    my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
 
     my $attach_req = create_attachment_post_request($attach_uri, $attachment_path, $config->{user_name}, $config->{'api_token'});
 

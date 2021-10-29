@@ -70,14 +70,14 @@ foreach (@ARGV) {
   }
 }
 
-die "Please fix the above problems before continuing\n" if $errors;
+die "Please fix the above problems before continuing\n" if $errors > 0;
 
 my %attachment_lookup = index_attachments();
 
 foreach my $page_name_and_path (@page_paths) {
   my ($page_name, $page_path) = (@$page_name_and_path);
 
-  if ($attachment_check) {
+  if ($attachment_check == 1) {
     check_attachments($page_name, $page_path);
   } else {
     upload($page_name, $page_path);

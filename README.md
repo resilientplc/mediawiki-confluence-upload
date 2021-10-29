@@ -41,6 +41,7 @@ You'll need:
   * HTTP::Request::Common
   * JSON
   * HTML::Entities
+  * Text::CSV
 * The UWC, cloned and built locally. You'll need Java 6 for that.
 * Access details for your MediaWiki database (database name, hostname, database prefix, database
   login and password). These should be available from your LocalSettings.php. e.g. in 

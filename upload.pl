@@ -29,6 +29,7 @@ use File::Spec;
 use LWP::UserAgent;
 use HTTP::Request::Common;
 use JSON;
+use Text::CSV;
 
 use lib '.';
 use TweakMarkup qw(tweak_markup find_attachment_filenames);
@@ -37,6 +38,7 @@ use TweakMarkup qw(tweak_markup find_attachment_filenames);
 sub load_properties;
 sub index_attachments;
 sub check_attachments;
+sub count_attachments;
 sub upload;
 sub load_page;
 sub create_post_request;
@@ -52,19 +54,34 @@ die "No 'confluence_host_name=xxxxx (like mycompany.atlassian.net)' in $config_f
 die "No 'attachment_directory=xxxxx (like /tmp/attachments)' in $config_file\n" unless defined($config->{attachment_directory});
 die "No 'export_directory=xxxxx (like /tmp/uwc/output)' in $config_file\n" unless defined($config->{export_directory});
 
+my $att_dir_len = length($config->{attachment_directory});
+my $exp_dir_len = length($config->{export_directory});
+
 # Get the list of pages from the command line...
 
 my @page_paths = (); # array of array references - each array reference is a [page name, file path]
 my $errors = 0;
 my $attachment_check = 0; # just scan files for attachments, verify their existence
+my $count_attachments = 0; # just report whether there are attachments or not
 foreach (@ARGV) {
   # process any command line args
   if (/--attachments|-a/) {
     $attachment_check = 1;
+  } elsif (/--countattachments|-c/) {
+    $count_attachments = 1;
+  } elsif (/--allpages|-p/) {
+    # scan for all pages in the export directory, rather than specifying pages
+    my @pages = glob("$config->{export_directory}/*");
+    foreach my $page_path (@pages) {
+      my $page_name = substr($page_path, $exp_dir_len + 1);
+      push @page_paths, [$page_name, $page_path];
+    }
+
   } elsif (/--help|-h|-\?/) {
     print "./upload.pl [options] 'Page 1 Name' 'Page 2 Name' ... 'Page N Name'\n";
     print "options: --help: show this help\n";
     print "         --attachments: verify existence of the pages' attachment files\n";
+    print "         --countattachments: count how many attachments pages have (csv output)\n";
     exit(0);
   } else {
     # Arguments that aren't options (don't start with hyphen) are page names whose files should be
@@ -84,10 +101,14 @@ die "Please fix the above problems before continuing\n" if $errors > 0;
 
 my %attachment_lookup = index_attachments();
 
+my $csv = $count_attachments == 1 ? Text::CSV->new ({ binary => 1, auto_diag => 1 }) : undef;
+
 foreach my $page_name_and_path (@page_paths) {
   my ($page_name, $page_path) = (@$page_name_and_path);
 
-  if ($attachment_check == 1) {
+  if ($count_attachments == 1) {
+    count_attachments($page_name, $page_path);
+  } elsif ($attachment_check == 1) {
     check_attachments($page_name, $page_path);
   } else {
     upload($page_name, $page_path);
@@ -98,7 +119,6 @@ exit(0);
 
 sub index_attachments {
   my $rule = File::Find::Rule->new;
-  my $att_dir_len = length($config->{attachment_directory});
   my @files = $rule->in($config->{attachment_directory});
   my %lookup = ();
   foreach (@files) {
@@ -147,6 +167,15 @@ sub check_attachments {
   if ($notfounds > 0) {
     print "$notfounds attachment(s) could not be found in $config->{attachment_directory}\n";
   }
+}
+
+sub count_attachments {
+  my ($page_name, $page_path) = @_;
+  my $mostly_confluence_markup = load_page($page_path);
+  my @attachments = find_attachment_filenames($mostly_confluence_markup);
+  my $row = [scalar(@attachments), "'$page_name'"];
+  my $fh = *STDOUT;
+  $csv->say($fh, $row);
 }
 
 sub upload {

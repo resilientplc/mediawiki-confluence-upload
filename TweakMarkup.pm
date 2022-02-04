@@ -12,11 +12,19 @@ our @EXPORT = qw(tweak_markup find_attachment_filenames);
 # Output: Proper Confluence markup
 sub tweak_markup {
     my $markup = shift; # a big string of Confluence markup
+    #warn "MARKUP: \n\n\n$markup\n\n\n\n";
+
     # [File__foo.txt] -> !foo.txt!
     $markup =~ s/\[File__([^\]]+?)\]/!${\(decode_entities($1))}!/g;
 
     # [Friendly name|File__foo.txt] -> [Friendly name^foo.txt]
     $markup =~ s/\[([^|]+?)\|File__([^\]]+?)\]/[$1^${\(decode_entities($2))}]/g;
+
+    # <b>...</b> -> *...*
+    $markup =~ s/<b>(.*?)<\/b>/*$1*/g; 
+
+    # {code} ... {code} -> {panel:borderStyle=dashed|borderColor=blue} ... {panel}
+    $markup =~ s/\{code\}(\S.*?\S)\{code\}/\{{$1}}/gs;
     return $markup;
 }
 

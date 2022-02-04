@@ -23,7 +23,7 @@ sub tweak_markup {
     # <b>...</b> -> *...*
     $markup =~ s/<b>(.*?)<\/b>/*$1*/g; 
 
-    # {code} ... {code} -> {panel:borderStyle=dashed|borderColor=blue} ... {panel}
+    # {code}...{code} -> {{...}}
     $markup =~ s/\{code\}(\S.*?\S)\{code\}/\{{$1}}/gs;
     return $markup;
 }

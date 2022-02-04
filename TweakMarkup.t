@@ -7,7 +7,7 @@ use TweakMarkup;
 
 my $markup = <<'EOF';
   This is some <b>markup</b> with an [File__MyImage.png] embedded in it not once but [File__MyImage.png] <b>twice</b>.
-  Here is another [File__OtherImage.png] <b>image</b> that's {code}wrong{code}. And a doc with an escaped name [File__T&amp;m-wo.doc].
+  '''Here''' is '''''another''''' [File__OtherImage.png] <b>image</b> that's {code}wrong{code}. And a doc with an escaped name [File__T&amp;m-wo.doc].
 * [Complicated Specification Document v2.2 (pdf)|File__ComplicatedInterfaceSpec2.2.pdf]
 
 EOF
@@ -15,7 +15,7 @@ EOF
 my $tweaked = tweak_markup($markup);
 my $expected = <<'EOF';
   This is some *markup* with an !MyImage.png! embedded in it not once but !MyImage.png! *twice*.
-  Here is another !OtherImage.png! *image* that's {{wrong}}. And a doc with an escaped name !T&m-wo.doc!.
+  *Here* is _another_ !OtherImage.png! *image* that's {{wrong}}. And a doc with an escaped name !T&m-wo.doc!.
 * [Complicated Specification Document v2.2 (pdf)^ComplicatedInterfaceSpec2.2.pdf]
 
 EOF

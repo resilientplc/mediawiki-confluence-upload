@@ -25,6 +25,12 @@ sub tweak_markup {
 
     # {code}...{code} -> {{...}}
     $markup =~ s/\{code\}(\S.*?\S)\{code\}/\{{$1}}/gs;
+
+    # '''''...''''' -> _..._
+    $markup =~ s/'''''(.*?)'''''/_$1_/g; 
+
+    # '''...''' -> *...*
+    $markup =~ s/'''(.*?)'''/*$1*/g; 
     return $markup;
 }
 

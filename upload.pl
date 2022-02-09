@@ -43,7 +43,7 @@ sub upload;
 sub load_page;
 sub create_post_request;
 sub create_attachment_post_request;
-
+sub capture;
 
 my $config_file = 'configuration.properties';
 my $config = load_properties($config_file);
@@ -277,51 +277,26 @@ sub upload {
     my $attachment_sub_path = $attachment_lookup{$attachment};
     my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
 
-    my $attach_req = create_attachment_post_request($attach_uri, $attachment_path, $config->{user_name}, $config->{'api_token'});
-
-    my $attach_response = $lwp->request( $attach_req );
-    unless ($attach_response->is_success) {
-      warn "Could not upload attachment '$attachment' to Confluence\n";
-      die "" . Dumper($attach_response) . "\n";
-    }
+    upload_attachment($attach_uri, $attachment_path, $config->{user_name}, $config->{'api_token'});
   }
   print "\n";
 }
 
-sub create_attachment_post_request {
+sub upload_attachment {
   my ($uri, $attachment_path, $user_name, $api_token) = @_;
-  my $attachment_filename = basename($attachment_path);
 
-  open my $fh, '<:raw', $attachment_path or die "Can't open attachment $attachment_path\n";
-  my $size = -s $attachment_path;
-  my $data = undef;
-  my $success = read $fh, $data, $size;
-  die "Can't read attachment $attachment_path: $!\n" unless defined $success;
-  close $fh;
-  print "attachment path $attachment_path attachment name $attachment_filename\n";
-
-  # my $req = HTTP::Request->new(POST => $uri,
-  #   HTTP::Headers->new(
-  #       'Accept'            => 'application/json',
-  #       'X-Atlassian-Token' => 'no-check',
-  #       'Content_Type'      => 'form-data',
-  #       'Content'           => [ $attachment_path ]
-  #   ),
-  # );
-  # $req->authorization_basic($user_name, $api_token);
-  my $req = HTTP::Request::Common::POST($uri,
-      Content_Type        => 'form-data',
-      'Accept'            => 'application/json',
-      'X-Atlassian-Token' => 'no-check',
-      'Content'           => {
-          'name' => 'file',
-          'filename'   => $attachment_filename,
-          'minorEdit'  => 'false',
-          'file'       => $data,
-      }
-  );
-  $req->authorization_basic($user_name, $api_token);
-  return $req;
+  my $cmd = "curl -D- -u $user_name:$api_token -X POST -H 'X-Atlassian-Token: nocheck' -F 'file=\@\"$attachment_path\"' -F 'minorEdit=\"false\"' $uri";
+  my ($exitCode, $stdoutLines, $stderrLines) = capture($cmd);
+  if ($exitCode != 0) {
+    print "Upload attachment with curl failed: $cmd\n";
+    foreach (@$stdoutLines) {
+      print "OUT: $_\n";
+    }
+    foreach (@$stderrLines) {
+      print "ERR: $_\n";
+    }
+    die "Could not upload attachment.\n";
+  }
 }
 
 sub create_post_request {
@@ -357,6 +332,23 @@ sub load_properties {
   close $cfh;
   return $config_hash;
 }
+
+# Run a command, capture its outputs, and return its exit code, stdout and stderr output lines (as a tuple of (int, arrayref, arrayref)).
+sub capture {
+  my $cmd = shift;
+
+  package change_to_import_capture_tinys_capture_into_some_other_package;
+  use Capture::Tiny ':all';
+  my ($stdout, $stderr, $exitCode) = Capture::Tiny::capture {
+    system($cmd);
+  };
+
+  my @stdoutLines = split('\n', $stdout);
+  my @stderrLines = split('\n', $stderr);
+  return ($exitCode, \@stdoutLines, \@stderrLines);
+}
+
+
 __END__
 
 convert json format:

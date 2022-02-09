@@ -71,6 +71,7 @@ foreach (@ARGV) {
     $count_attachments = 1;
   } elsif (/--allpages|-p/) {
     # scan for all pages in the export directory, rather than specifying pages
+    print "Scanning all pages under $config->{export_directory}\n";
     my @pages = glob("$config->{export_directory}/*");
     foreach my $page_path (@pages) {
       my $page_name = substr($page_path, $exp_dir_len + 1);
@@ -120,11 +121,16 @@ exit(0);
 sub index_attachments {
   my $rule = File::Find::Rule->new;
   my @files = $rule->in($config->{attachment_directory});
-  my %lookup = ();
+  my %lookup = (); # keyed on file name with _ in it.
   foreach (@files) {
     next if -d $_;
     my $sub_path = substr($_, $att_dir_len);
+    #print "$_ sub_path $sub_path\n";
+    next if $sub_path =~ m-(archive|temp|thumb)/-;
     my $file_name = basename($sub_path);
+    # File names have underscores eg 9/98/A_Walk_Through_A_T5_Test_b2.png
+    # markup is like [frameless|941x941px|File__A Walk Through A T5 Test v2.png]
+    # We're ignoring thumbnails, there isn't time to sort them out properly.
     my $attachment_spaces = $file_name;
     $attachment_spaces =~ s/_/ /g;
     $lookup{$attachment_spaces} = $sub_path;
@@ -207,7 +213,10 @@ sub upload {
   my $lwp = LWP::UserAgent->new;
   my $base_uri = "https://$config->{confluence_host_name}/wiki/rest/api";
 
+#  print "\n\n\n\ninitial markup.....\n\n$mostly_confluence_markup\n\n\n\n";
   my $better_confluence_markup = tweak_markup($mostly_confluence_markup);
+#  print "\n\n\n\ntweaked markup.....\n\n$better_confluence_markup\n\n\n\n";
+
 
   my $convert_uri = "$base_uri/contentbody/convert/storage";
   my $convert_json_hash = {
@@ -229,6 +238,8 @@ sub upload {
   my $storage_format = $convert_response->content();
   my $storage_format_hash = decode_json $storage_format;
   my $storage_value = $storage_format_hash->{value};
+
+#  print "\n\n\n\n\nstorage format.....\n\n$storage_value\n\n\n\n";
 
   # print Dumper($storage_value) . "\n";
 
@@ -279,13 +290,35 @@ sub upload {
 
 sub create_attachment_post_request {
   my ($uri, $attachment_path, $user_name, $api_token) = @_;
-  my $req = HTTP::Request->new(POST => $uri,
-    HTTP::Headers->new(
-        'Accept'            => 'application/json',
-        'X-Atlassian-Token' => 'no-check',
-        'Content_Type'      => 'form-data',
-        'Content'           => [ $attachment_path ]
-    ),
+  my $attachment_filename = basename($attachment_path);
+
+  open my $fh, '<:raw', $attachment_path or die "Can't open attachment $attachment_path\n";
+  my $size = -s $attachment_path;
+  my $data = undef;
+  my $success = read $fh, $data, $size;
+  die "Can't read attachment $attachment_path: $!\n" unless defined $success;
+  close $fh;
+  print "attachment path $attachment_path attachment name $attachment_filename\n";
+
+  # my $req = HTTP::Request->new(POST => $uri,
+  #   HTTP::Headers->new(
+  #       'Accept'            => 'application/json',
+  #       'X-Atlassian-Token' => 'no-check',
+  #       'Content_Type'      => 'form-data',
+  #       'Content'           => [ $attachment_path ]
+  #   ),
+  # );
+  # $req->authorization_basic($user_name, $api_token);
+  my $req = HTTP::Request::Common::POST($uri,
+      Content_Type        => 'form-data',
+      'Accept'            => 'application/json',
+      'X-Atlassian-Token' => 'no-check',
+      'Content'           => {
+          'name' => 'file',
+          'filename'   => $attachment_filename,
+          'minorEdit'  => 'false',
+          'file'       => $data,
+      }
   );
   $req->authorization_basic($user_name, $api_token);
   return $req;

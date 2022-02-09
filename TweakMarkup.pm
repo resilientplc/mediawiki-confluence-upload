@@ -14,11 +14,18 @@ sub tweak_markup {
     my $markup = shift; # a big string of Confluence markup
     #warn "MARKUP: \n\n\n$markup\n\n\n\n";
 
+    # [frameless|941x941px|File__A Walk Through A T5 Test v2.png] -> (get rid of frameless & dimensions)
+    $markup =~ s/\[frameless\|.*?\|/\[/g;
+
+
     # [File__foo.txt] -> !foo.txt!
     $markup =~ s/\[File__([^\]]+?)\]/!${\(decode_entities($1))}!/g;
 
     # [Friendly name|File__foo.txt] -> [Friendly name^foo.txt]
     $markup =~ s/\[([^|]+?)\|File__([^\]]+?)\]/[$1^${\(decode_entities($2))}]/g;
+
+    # !foo with spaces.txt! -> !foo_with_spaces.txt!
+    $markup =~ s/!(.*?)!/!${\(space_to_underscore($1))}!/g;
 
     # <b>...</b> -> *...*
     $markup =~ s/<b>(.*?)<\/b>/*$1*/g; 
@@ -26,12 +33,24 @@ sub tweak_markup {
     # {code}...{code} -> {{...}}
     $markup =~ s/\{code\}(\S.*?\S)\{code\}/\{{$1}}/gs;
 
-    # '''''...''''' -> _..._
-    $markup =~ s/'''''(.*?)'''''/_$1_/g; 
+    # '''''...''''' -> *_..._*
+    $markup =~ s/'''''(.*?)'''''/*_$1_*/g; 
 
     # '''...''' -> *...*
     $markup =~ s/'''(.*?)'''/*$1*/g; 
+
+    # ''...'' -> _..._
+    $markup =~ s/''(.*?)''/_$1_/g; 
+
+    # {{<nowiki>...</nowiki>}} -> {{...}} (but not if it's a URL)
+    $markup =~ s/\{\{<nowiki>((?!http).*?)<\/nowiki>\}\}/\{{$1}}/g; 
     return $markup;
+}
+
+sub space_to_underscore {
+    my $spaces = shift;
+    $spaces =~ s/ /_/g;
+    return $spaces;
 }
 
 # Find all attachment filenames.

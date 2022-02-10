@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 3;
+use Test::More tests => 4;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -52,5 +52,13 @@ EOF
   my $markup = "blah <b>markup</b> blah";
   my $tweaked = tweak_markup($markup);
   my $expected = "blah *markup* blah";
+  ok($tweaked eq $expected);
+}
+
+# 4. Markup: Image file link
+{
+  my $markup = "blah [File__MyImage.png] blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah !MyImage.png! blah";
   ok($tweaked eq $expected);
 }

@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 5;
+use Test::More tests => 6;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -71,3 +71,10 @@ EOF
   ok($tweaked eq $expected);
 }
 
+# 6. Markup: Bold italic '''''
+{
+  my $markup = "blah '''''markup''''' and '''''more''''' blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah *_markup_* and *_more_* blah";
+  ok($tweaked eq $expected);
+}

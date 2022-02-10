@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 9;
+use Test::More tests => 10;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -103,4 +103,11 @@ EOF
   ok($tweaked eq $expected);
 }
 
+# 10. Links: no thumbnails, just name
+{
+  my $markup = "blah [frameless|941x941px|File__A Walk Through A T5 Test v2.png] blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah !A_Walk_Through_A_T5_Test_v2.png! blah";
+  ok($tweaked eq $expected);
+}
 

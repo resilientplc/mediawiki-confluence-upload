@@ -12,11 +12,11 @@ our @EXPORT = qw(tweak_markup find_attachment_filenames);
 # Output: Proper Confluence markup
 sub tweak_markup {
     my $markup = shift; # a big string of Confluence markup
-    #warn "MARKUP: \n\n\n$markup\n\n\n\n";
+    #warn "MARKUP 1: \n\n\n$markup\n\n\n\n";
 
     # [frameless|941x941px|File__A Walk Through A T5 Test v2.png] -> (get rid of frameless & dimensions)
-    $markup =~ s/\[frameless\|.*?\|/\[/g;
-
+    # [frameless|File__A Walk Through A T5 Test v2.png] -> (get rid of frameless)
+    $markup =~ s/\[frameless(\|.*?)?\|/\[/g;
 
     # [File__foo.txt] -> !foo.txt!
     $markup =~ s/\[File__([^\]]+?)\]/!${\(decode_entities($1))}!/g;
@@ -43,7 +43,10 @@ sub tweak_markup {
     $markup =~ s/''(.*?)''/_$1_/g; 
 
     # {{<nowiki>...</nowiki>}} -> {{...}} (but not if it's a URL)
-    $markup =~ s/\{\{<nowiki>((?!http).*?)<\/nowiki>\}\}/\{{$1}}/g; 
+    $markup =~ s/\{\{<nowiki>((?!http).*?)<\/nowiki>\}\}/\{{$1}}/g;
+
+    #warn "MARKUP END: \n\n\n$markup\n\n\n\n";
+
     return $markup;
 }
 

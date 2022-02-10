@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 9;
+use Test::More tests => 10;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -86,3 +86,10 @@ EOF
   ok($tweaked eq $expected);
 }
 
+# 10. Links: no thumbnails, just name
+{
+  my $markup = "blah [frameless|File__API Documentation.doc] blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah !API_Documentation.doc! blah";
+  ok($tweaked eq $expected);
+}

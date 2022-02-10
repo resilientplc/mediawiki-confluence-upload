@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 2;
+use Test::More tests => 3;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -45,4 +45,12 @@ EOF
     print "att [$att]\n";
   }
   is_deeply(\@atts, ['MyImage.png', 'MyImage.png', 'OtherImage.png', 'T&m-wo.doc', 'ComplicatedInterfaceSpec2.2.pdf', 'A Walk Through A T5 Test v2.png'], 'find_attachment_filenames');
+}
+
+# 3. Markup: Bold
+{
+  my $markup = "blah <b>markup</b> blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah *markup* blah";
+  ok($tweaked eq $expected);
 }

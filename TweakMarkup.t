@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 8;
+use Test::More tests => 9;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -94,3 +94,13 @@ EOF
   my $expected = "blah !T&m-wo.doc! blah";
   ok($tweaked eq $expected);
 }
+
+# 9. Links: friendly and file name
+{
+  my $markup = "blah [Complicated Specification Document v2.2 (pdf)|File__ComplicatedInterfaceSpec2.2.pdf] blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah [Complicated Specification Document v2.2 (pdf)^ComplicatedInterfaceSpec2.2.pdf] blah";
+  ok($tweaked eq $expected);
+}
+
+

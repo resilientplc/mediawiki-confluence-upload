@@ -49,16 +49,16 @@ EOF
 
 # 3. Markup: Bold
 {
-  my $markup = "blah <b>markup</b> blah";
+  my $markup = "blah <b>markup</b> and <b>more</b> blah";
   my $tweaked = tweak_markup($markup);
-  my $expected = "blah *markup* blah";
+  my $expected = "blah *markup* and *more* blah";
   ok($tweaked eq $expected);
 }
 
 # 4. Markup: Image file link
 {
-  my $markup = "blah [File__MyImage.png] blah";
+  my $markup = "blah [File__MyImage.png] and [File__MyImage.png] blah";
   my $tweaked = tweak_markup($markup);
-  my $expected = "blah !MyImage.png! blah";
+  my $expected = "blah !MyImage.png! and !MyImage.png! blah";
   ok($tweaked eq $expected);
 }

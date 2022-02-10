@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 7;
+use Test::More tests => 8;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -84,5 +84,13 @@ EOF
   my $markup = "blah {code}monospaced{code} and {code}foo{code} blah";
   my $tweaked = tweak_markup($markup);
   my $expected = "blah {{monospaced}} and {{foo}} blah";
+  ok($tweaked eq $expected);
+}
+
+# 8. Links: escaped name
+{
+  my $markup = "blah [File__T&amp;m-wo.doc] blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah !T&m-wo.doc! blah";
   ok($tweaked eq $expected);
 }

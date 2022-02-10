@@ -1,6 +1,6 @@
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 4;
+use Test::More tests => 5;
 no warnings 'experimental::smartmatch';
 use lib '.';
 use TweakMarkup;
@@ -62,3 +62,12 @@ EOF
   my $expected = "blah !MyImage.png! and !MyImage.png! blah";
   ok($tweaked eq $expected);
 }
+
+# 5. Markup: Bold '''
+{
+  my $markup = "blah '''markup''' and '''more''' blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah *markup* and *more* blah";
+  ok($tweaked eq $expected);
+}
+

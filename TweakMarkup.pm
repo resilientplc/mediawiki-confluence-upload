@@ -12,20 +12,47 @@ our @EXPORT = qw(tweak_markup find_attachment_filenames);
 # Output: Proper Confluence markup
 sub tweak_markup {
     my $markup = shift; # a big string of Confluence markup
-    #warn "MARKUP 1: \n\n\n$markup\n\n\n\n";
+    # print "MARKUP 1: \n$markup\n";
 
+    # Only for File__ attachments...
     # [frameless|941x941px|File__A Walk Through A T5 Test v2.png] -> (get rid of frameless & dimensions)
     # [frameless|File__A Walk Through A T5 Test v2.png] -> (get rid of frameless)
-    $markup =~ s/\[frameless(\|.*?)?\|/\[/g;
+    # [400px||SCOM2|File__SCOM2.PNG]
+    # [none|thumb|536x536px|File__Import2.png]
+    # [511x511px|File__Import.png]
+    $markup =~ s/\[\S+?(\|\S*?)*(?=\|File__)\|/\[/g;
+    # print "MARKUP 2: \n$markup\n";
 
-    # [File__foo.txt] -> !foo.txt!
-    $markup =~ s/\[File__([^\]]+?)\]/!${\(decode_entities($1))}!/g;
+    # Decoded entities:
+    # [File__T&amp;m-wo.doc] -> [File__T&m-wo.doc]
+    $markup =~ s/\[File__(.*)\]/[File__${\(decode_entities($1))}]/g;
 
-    # [Friendly name|File__foo.txt] -> [Friendly name^foo.txt]
-    $markup =~ s/\[([^|]+?)\|File__([^\]]+?)\]/[$1^${\(decode_entities($2))}]/g;
+    # Images:
+    # [File__foo.png] -> !File__foo.png!
+    # Files:
+    # [File__foo.docx] -> [File__foo.docx]
+    $markup =~ s/(\[File__([^\]]+?)\])/${\(pling_for_image($1))}/g;
 
-    # !foo with spaces.txt! -> !foo_with_spaces.txt!
-    $markup =~ s/!(.*?)!/!${\(space_to_underscore($1))}!/g;
+    # Attachments without friendly names; just the filename:
+    # [File__9030346-BAU-BillingProcesses.pdf]
+    # [File__Test Strategy.docx]
+    # -> [^Test Criteria and Examples.pdf]
+    $markup =~ s/\[(File__.+?)\]/[^$1]/g;
+
+    # Attachments and links with friendly names:
+    # [Test Criteria and Examples (pdf)|File__Test Criteria and Examples.pdf]
+    # -> [Test Criteria and Examples (pdf)|^Test Criteria and Examples.pdf]
+    # [Acme Corporation|https://www.acme.com] -> [Acme Corporation|^https://www.acme.com]
+    # [Ubercorp|https://www.u.com] -> [Ubercorp|^https://www.u.com]
+    $markup =~ s/\[(.+?)\|(.+?)\]/[$1|^$2]/g;
+    # print "MARKUP 3: \n$markup\n";
+
+    # Images: !foo with spaces.txt! -> !foo_with_spaces.txt!
+    #$markup =~ s/!(.*?)!/!${\(space_to_underscore($1))}!/g;
+
+    $markup =~ s/File__//g;
+
+
 
     # <b>...</b> -> *...*
     $markup =~ s/<b>(.*?)<\/b>/*$1*/g; 
@@ -45,7 +72,7 @@ sub tweak_markup {
     # {{<nowiki>...</nowiki>}} -> {{...}} (but not if it's a URL)
     $markup =~ s/\{\{<nowiki>((?!http).*?)<\/nowiki>\}\}/\{{$1}}/g;
 
-    #warn "MARKUP END: \n\n\n$markup\n\n\n\n";
+    # print "MARKUP END: \n$markup\n";
 
     return $markup;
 }
@@ -54,6 +81,26 @@ sub space_to_underscore {
     my $spaces = shift;
     $spaces =~ s/ /_/g;
     return $spaces;
+}
+
+sub pling_for_image {
+    my $file = shift; # [potential friendly name|File__something.suffix]
+    if ($file =~ /\.(jpg|png|gif)\]$/i) {
+        $file =~ s/^\[/!/;
+        $file =~ s/\]$/!/;
+        return $file;
+    } else {
+        return $file
+    }
+}
+
+sub links_for_non_image {
+    my $file = shift;
+    if ($file =~ /\.(jpg|png|gif)$/i) {
+        return $file;
+    } else {
+        return "LinkTest^$file"; # May need "Wiki Page Name^$file" ?
+    }
 }
 
 # Find all attachment filenames.

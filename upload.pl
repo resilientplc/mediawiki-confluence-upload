@@ -191,6 +191,7 @@ sub upload {
   my @attachments = find_attachment_filenames($mostly_confluence_markup);
   my $attachment_errors = 0;
   foreach my $attachment (@attachments) {
+    print "Attachment '$attachment'\n";
     if (exists $attachment_lookup{$attachment}) {
       my $attachment_sub_path = $attachment_lookup{$attachment};
       my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
@@ -215,7 +216,7 @@ sub upload {
 
 #  print "\n\n\n\ninitial markup.....\n\n$mostly_confluence_markup\n\n\n\n";
   my $better_confluence_markup = tweak_markup($mostly_confluence_markup);
-#  print "\n\n\n\ntweaked markup.....\n\n$better_confluence_markup\n\n\n\n";
+  # print "\n\n\n\ntweaked markup.....\n\n$better_confluence_markup\n\n\n\n";
 
 
   my $convert_uri = "$base_uri/contentbody/convert/storage";
@@ -276,17 +277,31 @@ sub upload {
     print "Uploading attachment '$attachment'\n";
     my $attachment_sub_path = $attachment_lookup{$attachment};
     my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
+    print "  path: $attachment_path\n";
 
-    upload_attachment($attach_uri, $attachment_path, $config->{user_name}, $config->{'api_token'});
+    upload_attachment($attach_uri, $attachment, $attachment_path, $config->{user_name}, $config->{'api_token'});
   }
   print "\n";
 }
 
 sub upload_attachment {
-  my ($uri, $attachment_path, $user_name, $api_token) = @_;
+  my ($uri, $attachment, $attachment_path, $user_name, $api_token) = @_;
 
-  my $cmd = "curl -D- -u $user_name:$api_token -X POST -H 'X-Atlassian-Token: nocheck' -F 'file=\@\"$attachment_path\"' -F 'minorEdit=\"false\"' $uri";
-  my ($exitCode, $stdoutLines, $stderrLines) = capture($cmd);
+  my $cpcmd = "cp \"$attachment_path\" \"/tmp/$attachment\"";
+  my ($exitCode, $stdoutLines, $stderrLines) = capture($cpcmd);
+  if ($exitCode != 0) {
+    print "Copy/rename of attachment $attachment failed: $cpcmd\n";
+    foreach (@$stdoutLines) {
+      print "OUT: $_\n";
+    }
+    foreach (@$stderrLines) {
+      print "ERR: $_\n";
+    }
+    die "Could not copy attachment.\n";
+  }
+
+  my $cmd = "curl -D- -u $user_name:$api_token -X POST -H 'X-Atlassian-Token: nocheck' -F 'file=\@\"/tmp/$attachment\"' -F 'minorEdit=\"false\"' $uri";
+  ($exitCode, $stdoutLines, $stderrLines) = capture($cmd);
   if ($exitCode != 0) {
     print "Upload attachment with curl failed: $cmd\n";
     foreach (@$stdoutLines) {
@@ -297,6 +312,8 @@ sub upload_attachment {
     }
     die "Could not upload attachment.\n";
   }
+
+  unlink("/tmp/$attachment") or die "Could not remove temporary attachment /tmp/$attachment: $!\n";
 }
 
 sub create_post_request {

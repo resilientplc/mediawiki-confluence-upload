@@ -126,32 +126,46 @@ EOF
   ok($tweaked eq $expected);
 }
 
-# TODO friendly names to external resources don't render properly - the |^ markup doesn't seem to be right.
 
 # 15. Links: friendly name and URL
 {
   my $markup = "blah [Acme Corporation|https://www.acme.com/] blah";
   my $tweaked = tweak_markup($markup);
-  my $expected = "blah [Acme Corporation|^https://www.acme.com/] blah";
+  my $expected = "blah [Acme Corporation|https://www.acme.com/] blah";
   ok($tweaked eq $expected);
 }
 
-# 16. Links: friendly name and URL 2
+# 16. Links: friendly name (single word) and URL 2
 {
   my $markup = "blah [Ubercorp|https://www.u.com/] blah";
   my $tweaked = tweak_markup($markup);
-  my $expected = "blah [Ubercorp|^https://www.u.com/] blah";
+  my $expected = "blah [Ubercorp|https://www.u.com/] blah";
   ok($tweaked eq $expected);
 }
 
-# 16. Links: friendly name and URL 3
+# 17. Links: friendly name and URL 3
 {
   my $markup = "blah [New Mobile Operator Guide (pdf)|http://www.mnposg.org.uk/Main_Documents/New%20Mobile%20Operator%20Guide%201.1.pdf] blah";
   my $tweaked = tweak_markup($markup);
-  my $expected = "blah [New Mobile Operator Guide (pdf)|^http://www.mnposg.org.uk/Main_Documents/New%20Mobile%20Operator%20Guide%201.1.pdf] blah";
+  my $expected = "blah [New Mobile Operator Guide (pdf)|http://www.mnposg.org.uk/Main_Documents/New%20Mobile%20Operator%20Guide%201.1.pdf] blah";
   ok($tweaked eq $expected);
 }
 
+# 18. Just URL with no square brackets. Square brackets unnecessary.
+{
+  my $markup = "blah https://www.acme.com blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah https://www.acme.com blah";
+  ok($tweaked eq $expected);
+}
+
+# 19. Just URL with square brackets
+{
+  my $markup = "blah [https://www.acme.com] blah";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "blah [https://www.acme.com] blah";
+  ok($tweaked eq $expected);
+}
 
 
 

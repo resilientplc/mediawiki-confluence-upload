@@ -26,31 +26,39 @@ sub tweak_markup {
     # Decoded entities:
     # [File__T&amp;m-wo.doc] -> [File__T&m-wo.doc]
     $markup =~ s/\[File__(.*)\]/[File__${\(decode_entities($1))}]/g;
+    # print "MARKUP 3: \n$markup\n";
 
     # Images:
     # [File__foo.png] -> !File__foo.png!
     # Files:
     # [File__foo.docx] -> [File__foo.docx]
     $markup =~ s/(\[File__([^\]]+?)\])/${\(pling_for_image($1))}/g;
+    # print "MARKUP 4: \n$markup\n";
 
     # Attachments without friendly names; just the filename:
     # [File__9030346-BAU-BillingProcesses.pdf]
     # [File__Test Strategy.docx]
     # -> [^Test Criteria and Examples.pdf]
     $markup =~ s/\[(File__.+?)\]/[^$1]/g;
+    # print "MARKUP 5: \n$markup\n";
 
     # Attachments and links with friendly names:
     # [Test Criteria and Examples (pdf)|File__Test Criteria and Examples.pdf]
     # -> [Test Criteria and Examples (pdf)|^Test Criteria and Examples.pdf]
-    # [Acme Corporation|https://www.acme.com] -> [Acme Corporation|^https://www.acme.com]
-    # [Ubercorp|https://www.u.com] -> [Ubercorp|^https://www.u.com]
-    $markup =~ s/\[(.+?)\|(.+?)\]/[$1|^$2]/g;
-    # print "MARKUP 3: \n$markup\n";
+    # (note the inclusion of the caret ----^ for attachments)
+    # [Acme Corporation|https://www.acme.com] -> [Acme Corporation|https://www.acme.com]
+    # [Ubercorp|https://www.u.com] -> [Ubercorp|https://www.u.com]
+    # (note the absence of caret for links)
+    $markup =~ s/\[(.+?)\|(File__.+?)\]/[$1|^$2]/g;
+    $markup =~ s/\[(.+?)\|((?!File__).+?)\]/[$1|$2]/g;
+    # print "MARKUP 6: \n$markup\n";
 
     # Images: !foo with spaces.txt! -> !foo_with_spaces.txt!
     #$markup =~ s/!(.*?)!/!${\(space_to_underscore($1))}!/g;
+    # print "MARKUP 7: \n$markup\n";
 
     $markup =~ s/File__//g;
+    # print "MARKUP 8: \n$markup\n";
 
 
 

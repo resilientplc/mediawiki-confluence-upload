@@ -77,8 +77,8 @@ sub tweak_markup {
     # ''...'' -> _..._
     $markup =~ s/''(.*?)''/_$1_/g; 
 
-    # {{<nowiki>...</nowiki>}} -> {{...}} (but not if it's a URL)
-    $markup =~ s/\{\{<nowiki>((?!http).*?)<\/nowiki>\}\}/\{{$1}}/g;
+    # {{<nowiki>...</nowiki>}} -> {{...}}
+    $markup =~ s/\{\{<nowiki>(.*?)<\/nowiki>\}\}/\{{$1}}/g;
 
     # print "MARKUP END: \n$markup\n";
 

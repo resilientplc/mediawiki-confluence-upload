@@ -167,5 +167,22 @@ EOF
   ok($tweaked eq $expected);
 }
 
+# 20. Preformatted Markup with URL. {code}<nowiki>...</nowiki>{code} -> {{...}}
+{
+  my $markup = "via: {code}<nowiki>http://interesting.com</nowiki>{code} ok?";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "via: {{http://interesting.com}} ok?";
+  print ">> $tweaked <<\n";
+  ok($tweaked eq $expected);
+}
+
+# 21. Preformatted Markup without URL. {code}<nowiki>...</nowiki>{code} -> {{...}}
+{
+  my $markup = "via: {code}<nowiki>interesting text</nowiki>{code} ok?";
+  my $tweaked = tweak_markup($markup);
+  my $expected = "via: {{interesting text}} ok?";
+  print ">> $tweaked <<\n";
+  ok($tweaked eq $expected);
+}
 
 

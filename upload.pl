@@ -130,7 +130,9 @@ print "Finished argument processing\n" if $debug;
 
 die "Please fix the above problems before continuing\n" if $errors > 0;
 
+print "Indexing attachments...\n";
 my %attachment_lookup = index_attachments();
+print "... indexed.\n";
 
 print "CSV output?\n" if $debug;
 my $csv = $count_attachments == 1 || $show_features == 1 ? Text::CSV->new ({ binary => 1, auto_diag => 1 }) : undef;
@@ -245,16 +247,15 @@ sub check_attachments {
     if (defined $attachment_sub_path) {
       my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
       if (-f $attachment_path) {
-        print "++ OK! ++";
+        print "++ OK! ($attachment -> $attachment_path)\n";
       } else {
-        print "NOT FOUND";
+        print "NOT FOUND - $attachment\n";
         $notfounds++;
       }
     } else {
-      print "NOT INDEX";
+      print "NOT INDEX - $attachment\n";
       $notfounds++;
     }
-    print "  - '$attachment'\n";
   }
   if ($notfounds > 0) {
     print "!! $notfounds attachment(s) could not be found in $config->{attachment_directory}\n";
@@ -285,6 +286,8 @@ sub upload {
       if (! -f $attachment_path) {
         print "  Attachment '$attachment' does not exist in the attachment directory\n";
         $attachment_errors++;
+      } else {
+        print "  Attachment '$attachment' found at $attachment_path\n";
       }
     } else {
       print "  Attachment '$attachment' has no lookup entry\n";
@@ -361,11 +364,15 @@ sub upload {
   print "Page '$page_name' (id $id) has " . scalar(@attachments) . " attachment(s):\n";
   foreach my $attachment (@attachments) {
     print "Uploading attachment '$attachment'\n";
-    my $attachment_sub_path = $attachment_lookup{$attachment};
-    my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
-    print "  path: $attachment_path\n";
+    my $attachment_sub_path = lookup_attachment($attachment);
+    if (defined $attachment_sub_path) {
+      my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
+      print "  path: $attachment_path\n";
 
-    upload_attachment($attach_uri, $attachment, $attachment_path, $config->{user_name}, $config->{'api_token'});
+      upload_attachment($attach_uri, $attachment, $attachment_path, $config->{user_name}, $config->{'api_token'});
+    } else {
+      die "Could not find attachment $attachment\n";
+    }
   }
   print "\n";
 }

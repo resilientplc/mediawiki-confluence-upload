@@ -176,11 +176,11 @@ sub index_attachments {
     next if -d $_;
     my $sub_path = substr($_, $att_dir_len);
     #print "$_ sub_path $sub_path\n";
+    # We're ignoring thumbnails, there isn't time to sort them out properly.
     next if $sub_path =~ m-(archive|temp|thumb)/-;
     my $file_name = basename($sub_path);
     # File names have underscores eg 9/98/A_Walk_Through_A_T5_Test_b2.png
     # markup is like [frameless|941x941px|File__A Walk Through A T5 Test v2.png]
-    # We're ignoring thumbnails, there isn't time to sort them out properly.
     my $attachment_spaces = $file_name;
     $attachment_spaces =~ s/_/ /g;
     $lookup{$attachment_spaces} = $sub_path;

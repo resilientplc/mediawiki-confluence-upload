@@ -63,13 +63,22 @@ my @page_paths = (); # array of array references - each array reference is a [pa
 my $errors = 0;
 my $attachment_check = 0; # just scan files for attachments, verify their existence
 my $count_attachments = 0; # just report whether there are attachments or not
-foreach (@ARGV) {
+my $show_features = 0; # just report: Page Name, Has Attachments, Has Tables
+my $debug = 0;
+foreach my $arg (@ARGV) {
+  print "arg [$arg]\n" if $debug;
   # process any command line args
-  if (/--attachments|-a/) {
+  if ($arg =~ /^(--debug|-d)$/) {
+    $debug = 1;
+  } elsif ($arg =~ /^(--attachments|-a)$/) {
     $attachment_check = 1;
-  } elsif (/--countattachments|-c/) {
+  } elsif ($arg =~ /^(--countattachments|-c)$/) {
     $count_attachments = 1;
-  } elsif (/--allpages|-p/) {
+  } elsif ($arg =~ /^(--features|-f)$/) {
+    $show_features = 1;
+    print "Showing features\n" if $debug;
+  } elsif ($arg =~ /^(--allpages|-p)$/) {
+    print "Scanning\n" if $debug;
     # scan for all pages in the export directory, rather than specifying pages
     print "Scanning all pages under $config->{export_directory}\n";
     my @pages = glob("$config->{export_directory}/*");
@@ -78,16 +87,35 @@ foreach (@ARGV) {
       push @page_paths, [$page_name, $page_path];
     }
 
-  } elsif (/--help|-h|-\?/) {
+  } elsif ($arg =~ /^(--help|-h|-\?)$/) {
     print "./upload.pl [options] 'Page 1 Name' 'Page 2 Name' ... 'Page N Name'\n";
     print "options: --help: show this help\n";
+    print "         --allpages: scan all pages in the export directory, not just those specified\n";
     print "         --attachments: verify existence of the pages' attachment files\n";
     print "         --countattachments: count how many attachments pages have (csv output)\n";
+    print "         --features: show page names, attachment state, table state (csv output)\n";
+    print "         --pagesfile=input.txt : process the pages whose names are contained in input.txt\n";
     exit(0);
+  } elsif ($arg =~ /--pagesfile=(\S+)/) {
+    my $pagesfile = $1;
+    open (my $fh, '<', $pagesfile) or die "Can't open $pagesfile: $!\n";
+    while (<$fh>) {
+      chomp;
+      my $page_name = $_;
+      my $page_path = File::Spec->catfile($config->{export_directory}, $page_name);
+      if (-f $page_path) {
+        push @page_paths, [$page_name, $page_path];
+      } else {
+        warn "Cannot find the page '$page_name' under the export directory '$config->{export_directory}' (path is $page_path)\n";
+        $errors = 1;
+      }
+    }
+    close $fh;
   } else {
     # Arguments that aren't options (don't start with hyphen) are page names whose files should be
     # found in the export_directory.
-    my $page_name = $_;
+    print "Specified page $arg\n" if $debug;
+    my $page_name = $arg;
     my $page_path = File::Spec->catfile($config->{export_directory}, $page_name);
     if (-f $page_path) {
       push @page_paths, [$page_name, $page_path];
@@ -98,12 +126,16 @@ foreach (@ARGV) {
   }
 }
 
+print "Finished argument processing\n" if $debug;
+
 die "Please fix the above problems before continuing\n" if $errors > 0;
 
 my %attachment_lookup = index_attachments();
 
-my $csv = $count_attachments == 1 ? Text::CSV->new ({ binary => 1, auto_diag => 1 }) : undef;
+print "CSV output?\n" if $debug;
+my $csv = $count_attachments == 1 || $show_features == 1 ? Text::CSV->new ({ binary => 1, auto_diag => 1 }) : undef;
 
+print "Main processing\n" if $debug;
 foreach my $page_name_and_path (@page_paths) {
   my ($page_name, $page_path) = (@$page_name_and_path);
 
@@ -111,12 +143,30 @@ foreach my $page_name_and_path (@page_paths) {
     count_attachments($page_name, $page_path);
   } elsif ($attachment_check == 1) {
     check_attachments($page_name, $page_path);
+  } elsif ($show_features == 1) {
+    show_features($page_name, $page_path);
   } else {
     upload($page_name, $page_path);
   }
 }
 
 exit(0);
+
+sub show_features {
+  my ($page_name, $page_path) = @_;
+  my $mostly_confluence_markup = load_page($page_path);
+  my @attachments = find_attachment_filenames($mostly_confluence_markup);
+  my $has_tables = has_table_markup($mostly_confluence_markup);
+  my $row = ["'$page_name'", scalar(@attachments) ? "Y" : "N", $has_tables ? "Y" : "N"];
+  my $fh = *STDOUT;
+  $csv->say($fh, $row);
+}
+
+sub has_table_markup {
+  my $markup = shift;
+  return 1 if $markup =~ /(^\|\||wikitable)/m;
+  return 0;
+}
 
 sub index_attachments {
   my $rule = File::Find::Rule->new;
@@ -149,10 +199,11 @@ sub index_attachments {
 
 sub check_attachments {
   my ($page_name, $page_path) = @_;
-  print "Checking attachments for '$page_name'...\n";
+  #print "Checking attachments for '$page_name'...\n";
   my $mostly_confluence_markup = load_page($page_path);
   my @attachments = find_attachment_filenames($mostly_confluence_markup);
-  print "Page '$page_name' has " . scalar(@attachments) . " attachment(s):\n";
+  return unless(scalar @attachments);
+  print "\nPage '$page_name' has " . scalar(@attachments) . " attachment(s):\n";
   my $notfounds = 0;
   foreach my $attachment (@attachments) {
     if (exists $attachment_lookup{$attachment}) {
@@ -171,8 +222,9 @@ sub check_attachments {
     print "  - '$attachment'\n";
   }
   if ($notfounds > 0) {
-    print "$notfounds attachment(s) could not be found in $config->{attachment_directory}\n";
+    print "!! $notfounds attachment(s) could not be found in $config->{attachment_directory}\n";
   }
+  print "\n";
 }
 
 sub count_attachments {
@@ -205,8 +257,7 @@ sub upload {
     }
   }
   if ($attachment_errors > 0) {
-    print "Cannot proceed with missing attachments\n";
-    return;
+    die "Cannot proceed with missing attachments\n";
   }
 
   print "Converting '$page_name' to storage format...\n";

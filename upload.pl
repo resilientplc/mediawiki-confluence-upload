@@ -177,7 +177,7 @@ sub index_attachments {
     my $sub_path = substr($_, $att_dir_len);
     #print "$_ sub_path $sub_path\n";
     # We're ignoring thumbnails, there isn't time to sort them out properly.
-    next if $sub_path =~ m-(archive|temp|thumb)/-;
+    next if $sub_path =~ m-(archive|temp|thumb|deleted)/-;
     my $file_name = basename($sub_path);
     # File names have underscores eg 9/98/A_Walk_Through_A_T5_Test_b2.png
     # markup is like [frameless|941x941px|File__A Walk Through A T5 Test v2.png]
@@ -193,8 +193,43 @@ sub index_attachments {
         $lookup{$file_name} = $sub_path;
       }
     }
+    # However MediaWiki seems very lenient; a file might be called Product_Manual_v3_2.pdf with
+    # a markup like [File__Product Manual v3_2.pdf]
+    # There's also the case issue - A file might be called Somethingy.png and referred to in the
+    # markup as [File__somethingy.png].
+    # This requires a cunning plan: compress all file names by removing spaces, underscores, other
+    # punctuation, and convert to lower case. Do the same transform when searching a name from
+    # markup, and with luck a file will be found.
+    my $attachment_compressed = compress_file_name($file_name);
+    # Don't think this matters..
+    # if (exists ($lookup{$attachment_compressed})) {
+    #  print "Attachment (compression) collision '$attachment_compressed' with $file_name\n";
+    #  print "original($file_name): $lookup{$file_name}\n\n";
+    #}
+    $lookup{$attachment_compressed} = $sub_path;
   }
   return %lookup;
+}
+
+sub compress_file_name {
+  my $file_name = shift;
+  $file_name =~ s/[ _\.,\(\)\-]+//g;
+  $file_name = lc($file_name);
+  return $file_name;
+}
+
+sub lookup_attachment {
+  my $attachment = shift;
+  # Try straight..
+  if (exists $attachment_lookup{$attachment}) {
+    return $attachment_lookup{$attachment};
+  }
+  # Try compressed..
+  my $attachment_compressed = compress_file_name($attachment);
+  if (exists $attachment_lookup{$attachment_compressed}) {
+    return $attachment_lookup{$attachment_compressed};
+  }
+  return undef;
 }
 
 sub check_attachments {
@@ -206,8 +241,8 @@ sub check_attachments {
   print "\nPage '$page_name' has " . scalar(@attachments) . " attachment(s):\n";
   my $notfounds = 0;
   foreach my $attachment (@attachments) {
-    if (exists $attachment_lookup{$attachment}) {
-      my $attachment_sub_path = $attachment_lookup{$attachment};
+    my $attachment_sub_path = lookup_attachment($attachment);
+    if (defined $attachment_sub_path) {
       my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
       if (-f $attachment_path) {
         print "++ OK! ++";
@@ -244,8 +279,8 @@ sub upload {
   my $attachment_errors = 0;
   foreach my $attachment (@attachments) {
     print "Attachment '$attachment'\n";
-    if (exists $attachment_lookup{$attachment}) {
-      my $attachment_sub_path = $attachment_lookup{$attachment};
+    my $attachment_sub_path = lookup_attachment($attachment);
+    if (defined $attachment_sub_path) {
       my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
       if (! -f $attachment_path) {
         print "  Attachment '$attachment' does not exist in the attachment directory\n";

@@ -91,10 +91,12 @@ foreach my $arg (@ARGV) {
     print "./upload.pl [options] 'Page 1 Name' 'Page 2 Name' ... 'Page N Name'\n";
     print "options: --help: show this help\n";
     print "         --allpages: scan all pages in the export directory, not just those specified\n";
+    print "         --pagesfile=input.txt : process the pages whose names are contained in input.txt\n";
+    print "The list of pages provided will be uploaded, with progress written to 'progress.csv'\n\n";
+    print "The following options do not upload, but perform tests...\n";
     print "         --attachments: verify existence of the pages' attachment files\n";
     print "         --countattachments: count how many attachments pages have (csv output)\n";
     print "         --features: show page names, attachment state, table state (csv output)\n";
-    print "         --pagesfile=input.txt : process the pages whose names are contained in input.txt\n";
     exit(0);
   } elsif ($arg =~ /--pagesfile=(\S+)/) {
     my $pagesfile = $1;
@@ -137,7 +139,9 @@ print "... indexed.\n";
 print "CSV output?\n" if $debug;
 my $csv = $count_attachments == 1 || $show_features == 1 ? Text::CSV->new ({ binary => 1, auto_diag => 1 }) : undef;
 
-print "Main processing\n" if $debug;
+my $doing_upload = $count_attachments == 0 && $attachment_check == 0 && $show_features == 0;
+my $upload_status = {};
+
 foreach my $page_name_and_path (@page_paths) {
   my ($page_name, $page_path) = (@$page_name_and_path);
 
@@ -148,8 +152,19 @@ foreach my $page_name_and_path (@page_paths) {
   } elsif ($show_features == 1) {
     show_features($page_name, $page_path);
   } else {
-    upload($page_name, $page_path);
+    $upload_status->{$page_name} = upload($page_name, $page_path);
   }
+}
+
+if ($doing_upload) {
+  my $progress_file = 'progress.csv';
+  open (my $fh, '>>', "progress.csv") or die "Can't open $progress_file: $!\n";
+  my $csv_progress = Text::CSV->new({ binary => 1, auto_diag => 1 });
+  foreach my $page (sort(keys(%$upload_status))) {
+    my $row = [$page, $upload_status->{$page}];
+    $csv_progress->say($fh, $row);
+  }
+  close($fh);
 }
 
 exit(0);
@@ -274,12 +289,12 @@ sub count_attachments {
 
 sub upload {
   my ($page_name, $page_path) = @_;
-  print "Checking attachment(s) existence for '$page_name'...\n";
+  print "\n*** Checking attachment(s) existence for '$page_name'...\n";
   my $mostly_confluence_markup = load_page($page_path);
   my @attachments = find_attachment_filenames($mostly_confluence_markup);
   my $attachment_errors = 0;
   foreach my $attachment (@attachments) {
-    print "Attachment '$attachment'\n";
+    # print "Attachment '$attachment'\n";
     my $attachment_sub_path = lookup_attachment($attachment);
     if (defined $attachment_sub_path) {
       my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
@@ -287,7 +302,7 @@ sub upload {
         print "  Attachment '$attachment' does not exist in the attachment directory\n";
         $attachment_errors++;
       } else {
-        print "  Attachment '$attachment' found at $attachment_path\n";
+        # print "  Attachment '$attachment' found at $attachment_path\n";
       }
     } else {
       print "  Attachment '$attachment' has no lookup entry\n";
@@ -295,10 +310,11 @@ sub upload {
     }
   }
   if ($attachment_errors > 0) {
-    die "Cannot proceed with missing attachments\n";
+    warn "!!! Cannot proceed with missing attachments\n";
+    return 'Missing attachments';
   }
 
-  print "Converting '$page_name' to storage format...\n";
+  print "*** Converting '$page_name' to storage format...\n";
 
   my $lwp = LWP::UserAgent->new;
   my $base_uri = "https://$config->{confluence_host_name}/wiki/rest/api";
@@ -319,11 +335,12 @@ sub upload {
   my $convert_response = $lwp->request( $convert_req );
   unless ($convert_response->is_success) {
     warn "Could not convert markup to storage format\n";
-    die "" . Dumper($convert_response) . "\n";
+    warn "" . Dumper($convert_response) . "\n";
+    return 'Storage format conversion failure';
   }
   # print Dumper($convert_response) . "\n";
 
-  print "Uploading storage format version of '$page_name' to Confluence...\n";
+  print "*** Uploading storage format version of '$page_name' to Confluence...\n";
 
   my $storage_format = $convert_response->content();
   my $storage_format_hash = decode_json $storage_format;
@@ -352,7 +369,8 @@ sub upload {
   my $content_response = $lwp->request( $content_req );
   unless ($content_response->is_success) {
     warn "Could not upload markup to Confluence\n";
-    die "" . Dumper($content_response) . "\n";
+    warn "" . Dumper($content_response) . "\n";
+    return 'Markup upload failure';
   }
 
   # print "content response: " . Dumper($content_response) . "\n";
@@ -367,14 +385,20 @@ sub upload {
     my $attachment_sub_path = lookup_attachment($attachment);
     if (defined $attachment_sub_path) {
       my $attachment_path = File::Spec->catfile($config->{attachment_directory}, $attachment_sub_path);
-      print "  path: $attachment_path\n";
+      # print "  path: $attachment_path\n";
 
-      upload_attachment($attach_uri, $attachment, $attachment_path, $config->{user_name}, $config->{'api_token'});
+      my $attachment_status = upload_attachment($attach_uri, $attachment, $attachment_path, $config->{user_name}, $config->{'api_token'});
+      if (defined $attachment_status) {
+        warn "Could not upload attachment '$attachment': $attachment_status\n";
+        return 'Attachment upload failure';
+      }
     } else {
-      die "Could not find attachment $attachment\n";
+      warn "Could not find attachment $attachment\n";
+      return "Unexpected failure to find attachment $attachment";
     }
   }
   print "\n";
+  return 'OK';
 }
 
 sub upload_attachment {
@@ -390,7 +414,8 @@ sub upload_attachment {
     foreach (@$stderrLines) {
       print "ERR: $_\n";
     }
-    die "Could not copy attachment.\n";
+    warn "Could not copy attachment.\n";
+    return 'Copy failure';
   }
 
   my $cmd = "curl -D- -u $user_name:$api_token -X POST -H 'X-Atlassian-Token: nocheck' -F 'file=\@\"/tmp/$attachment\"' -F 'minorEdit=\"false\"' $uri";
@@ -403,10 +428,15 @@ sub upload_attachment {
     foreach (@$stderrLines) {
       print "ERR: $_\n";
     }
-    die "Could not upload attachment.\n";
+    warn "Could not upload attachment.\n";
+    return 'Upload failure';
   }
 
-  unlink("/tmp/$attachment") or die "Could not remove temporary attachment /tmp/$attachment: $!\n";
+  unless (unlink("/tmp/$attachment")) {
+    warn "Could not remove temporary attachment /tmp/$attachment: $!\n";
+    return 'Temporary attachment deletion failure';
+  }
+  return undef; # All OK
 }
 
 sub create_post_request {

@@ -64,6 +64,7 @@ my $errors = 0;
 my $attachment_check = 0; # just scan files for attachments, verify their existence
 my $count_attachments = 0; # just report whether there are attachments or not
 my $show_features = 0; # just report: Page Name, Has Attachments, Has Tables
+my $show_graph = 0; # just show the graph of pages linked to from the requested pages
 my $debug = 0;
 foreach my $arg (@ARGV) {
   print "arg [$arg]\n" if $debug;
@@ -77,6 +78,9 @@ foreach my $arg (@ARGV) {
   } elsif ($arg =~ /^(--features|-f)$/) {
     $show_features = 1;
     print "Showing features\n" if $debug;
+  } elsif ($arg =~ /^(--graph|-g)$/) {
+    $show_graph = 1;
+    print "Showing link graph\n" if $debug;
   } elsif ($arg =~ /^(--allpages|-p)$/) {
     print "Scanning\n" if $debug;
     # scan for all pages in the export directory, rather than specifying pages
@@ -97,6 +101,7 @@ foreach my $arg (@ARGV) {
     print "         --attachments: verify existence of the pages' attachment files\n";
     print "         --countattachments: count how many attachments pages have (csv output)\n";
     print "         --features: show page names, attachment state, table state (csv output)\n";
+    print "         --graph: show the graph of pages linked to by the set of requested pages\n";
     exit(0);
   } elsif ($arg =~ /--pagesfile=(\S+)/) {
     my $pagesfile = $1;
@@ -142,6 +147,8 @@ my $csv = $count_attachments == 1 || $show_features == 1 ? Text::CSV->new ({ bin
 my $doing_upload = $count_attachments == 0 && $attachment_check == 0 && $show_features == 0;
 my $upload_status = {};
 
+my %page_graph_set = (); # key: page name, value: 1 (irrelevant). It's a set.
+
 foreach my $page_name_and_path (@page_paths) {
   my ($page_name, $page_path) = (@$page_name_and_path);
 
@@ -151,8 +158,16 @@ foreach my $page_name_and_path (@page_paths) {
     check_attachments($page_name, $page_path);
   } elsif ($show_features == 1) {
     show_features($page_name, $page_path);
+  } elsif ($show_graph == 1) {
+    show_graph($page_name);
   } else {
     $upload_status->{$page_name} = upload($page_name, $page_path);
+  }
+}
+
+if ($show_graph == 1) {
+  foreach (sort (keys %page_graph_set)) {
+    print "$_\n";
   }
 }
 
@@ -168,6 +183,27 @@ if ($doing_upload) {
 }
 
 exit(0);
+
+sub show_graph {
+  my ($page_name) = @_;
+  if (exists $page_graph_set{$page_name}) {
+    # print "Already scanned $page_name\n";
+    return;
+  }
+  my $page_path = File::Spec->catfile($config->{export_directory}, $page_name);
+  if (!-e $page_path) {
+    print "!!! Can't load page $page_name\n";
+    return;
+  }
+
+  my $mostly_confluence_markup = load_page($page_path);
+  my @links = find_page_links($mostly_confluence_markup);
+  #print "Links in '$page_name' are: (@links)\n";
+  foreach (@links) {
+    $page_graph_set{$_} = 1;
+    show_graph($_);
+  }
+}
 
 sub show_features {
   my ($page_name, $page_path) = @_;

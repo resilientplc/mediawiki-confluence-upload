@@ -4,7 +4,7 @@ use HTML::Entities qw(decode_entities);
 
 use Exporter qw(import);
 
-our @EXPORT = qw(tweak_markup find_attachment_filenames);
+our @EXPORT = qw(tweak_markup find_attachment_filenames find_page_links);
 
 # Fixes up some markup conversions that the Universal Wiki Converter doesn't quite get right.
 # (Converting from MediaWiki to Confluence markup).
@@ -121,5 +121,15 @@ sub find_attachment_filenames {
     my @decoded = map { decode_entities($_) } @attachments;
     # print "Decoded is @decoded\n";
     return @decoded;
+}
+
+# Find all page links.
+# Input: Confluence markup (with bits of Mediawiki markup)
+# Output: all page names linked from the input page
+sub find_page_links {
+    my $markup = shift; # a big string of Confluence markup (?:[^|]+?\|)?
+    my @links = ($markup =~ /\[(?!File__)([^\[^\]^|]+?)\]/g);
+    # print "links are @links\n";
+    return @links;
 }
 1;
